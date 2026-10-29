@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#f5f5f5" />
+    <meta name="description" content="A minimal mobile review client for WaniKani." />
+    <title>WKFast · Reviews</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/style.css" />
+    <script type="importmap">
+      { "imports": {
+        "preact": "./vendor/preact.module.js",
+        "preact/hooks": "./vendor/hooks.module.js",
+        "htm": "./vendor/htm.module.js"
+      } }
+    </script>
+  </head>
+  <body>
+    <div id="root"><p class="startup">Loading WKFast…</p></div>
+    <noscript>Enable JavaScript to review with WKFast.</noscript>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
