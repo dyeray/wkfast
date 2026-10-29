@@ -27,12 +27,9 @@ function FailedAnswer({ revealed, value, lang, onShow, onNext, onRetry }) {
 function Review({ initialItem, api, onDone, onNext }) {
   const [item, dispatch] = useReducer(reviewReducer, initialItem);
   const [input, setInput] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
   const [composing, setComposing] = useState(false);
   const [selectedKanji, setSelectedKanji] = useState(null);
   const [touchInput] = useState(() => matchMedia('(pointer: coarse)').matches);
-  const busy = useRef(false);
   const leaving = useRef(false);
   const field = useRef(null);
   const caret = useRef(null);
@@ -50,29 +47,17 @@ function Review({ initialItem, api, onDone, onNext }) {
     }
   });
 
-  async function save(completedItem, retry = false) {
-    if (busy.current || leaving.current) return;
-    busy.current = true;
-    setSaving(true);
-    setError('');
-    try {
-      await api.saveReview(completedItem, retry);
-      leaving.current = true;
-      onDone(false);
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      busy.current = false;
-      setSaving(false);
-    }
-  }
-
   function answer(action) {
-    if (busy.current || leaving.current) return;
+    if (leaving.current) return;
     const next = reviewReducer(item, action);
     if (action.type === 'meaning' && !action.correct && next !== item) {
       leaving.current = true;
       onNext(next);
+      return;
+    }
+    if (next.phase === 'ready' && phase !== 'ready') {
+      leaving.current = true;
+      onDone(false, next);
       return;
     }
     dispatch(action);
@@ -82,7 +67,6 @@ function Review({ initialItem, api, onDone, onNext }) {
       field.current.classList.add('shake');
       field.current.setSelectionRange(0, input.length);
     }
-    if (next.phase === 'ready' && phase !== 'ready') save(next);
   }
 
   function changeInput(value) {
@@ -104,14 +88,14 @@ function Review({ initialItem, api, onDone, onNext }) {
   }
 
   function snooze() {
-    if (busy.current || leaving.current || phase === 'ready') return;
+    if (leaving.current || phase === 'ready') return;
     leaving.current = true;
     dispatch({ type: 'snooze' });
     onDone(true);
   }
 
   function next() {
-    if (busy.current || leaving.current || feedback !== 'incorrect') return;
+    if (leaving.current || feedback !== 'incorrect') return;
     leaving.current = true;
     onNext(item);
   }
@@ -176,19 +160,9 @@ function Review({ initialItem, api, onDone, onNext }) {
         </form>
       `}
 
-      ${phase === 'ready' && html`
-        <div class="save-status" aria-live="polite">
-          <p class="eyebrow">Review complete</p>
-          ${saving ? html`<p>Saving to WaniKani…</p>` : error ? html`
-            <p class="error" role="alert">${error}</p>
-            <button class="primary" onClick=${() => save(item, true)}>Retry save</button>
-          ` : html`<p>Saved.</p>`}
-        </div>
-      `}
-
       <div class="review-footer">
         <span>${item.mistakes.meaning + item.mistakes.reading} mistakes</span>
-        <button class="text-button snooze" onClick=${snooze} disabled=${phase === 'ready' || saving}>Snooze</button>
+        <button class="text-button snooze" onClick=${snooze} disabled=${phase === 'ready'}>Snooze</button>
       </div>
       ${selectedKanji && html`<${KanjiDetails} character=${selectedKanji} subject=${subject} api=${api} onClose=${() => setSelectedKanji(null)} />`}
     </section>
@@ -203,6 +177,16 @@ export function App({ initialToken = '' }) {
   const [cursor, setCursor] = useState(0);
   const [completed, setCompleted] = useState(0);
   const [snoozed, setSnoozed] = useState(0);
+  const [pending, setPending] = useState([]);
+  const inFlight = useRef(new Set());
+  const savingCount = pending.filter(entry => entry.saving).length;
+
+  useLayoutEffect(() => {
+    if (!pending.length) return;
+    const warn = event => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [pending.length]);
 
   useEffect(() => {
     if (!api) return;
@@ -216,9 +200,25 @@ export function App({ initialToken = '' }) {
     return () => { active = false; };
   }, [api, reload]);
 
-  function advance(skipped) {
+  async function save(item, retry = false) {
+    const id = item.assignment.id;
+    if (inFlight.current.has(id)) return;
+    inFlight.current.add(id);
+    setPending(current => [...current.filter(entry => entry.item.assignment.id !== id), { item, saving: true, error: '' }]);
+    try {
+      await api.saveReview(item, retry);
+      setPending(current => current.filter(entry => entry.item.assignment.id !== id));
+      setCompleted(value => value + 1);
+    } catch (error) {
+      setPending(current => current.map(entry => entry.item.assignment.id === id ? { ...entry, saving: false, error: error.message } : entry));
+    } finally {
+      inFlight.current.delete(id);
+    }
+  }
+
+  function advance(skipped, item) {
     if (skipped) setSnoozed(value => value + 1);
-    else setCompleted(value => value + 1);
+    else save(item);
     setCursor(value => value + 1);
   }
 
@@ -231,7 +231,7 @@ export function App({ initialToken = '' }) {
     <div class="app-shell">
       <header class="app-header">
         <h1>WK<span>Fast</span><span class="brand-dot" aria-hidden="true"></span></h1>
-        <span class="session-progress" aria-live="polite">${api && items ? `${completed} done · ${items.length - cursor} left` : 'Reviews, simplified.'}</span>
+        <span class="session-progress" aria-live="polite">${api && items ? `${completed + pending.length} done · ${items.length - cursor} left` : 'Reviews, simplified.'}</span>
       </header>
       <main>
         ${!api ? html`
@@ -251,12 +251,23 @@ export function App({ initialToken = '' }) {
           <${Review} key=${`${cursor}:${items[cursor].assignment.id}`} initialItem=${items[cursor]} api=${api} onDone=${advance} onNext=${next} />
         ` : html`
           <section class="session-message complete">
-            <div class="complete-mark" aria-hidden="true">✓</div>
-            <p class="eyebrow">A good place to pause.</p>
-            <h2>${items.length ? 'Session complete' : 'All caught up'}</h2>
+            ${!pending.length && html`<div class="complete-mark" aria-hidden="true">✓</div><p class="eyebrow">A good place to pause.</p>`}
+            <h2>${pending.length ? 'Answers complete' : items.length ? 'Session complete' : 'All caught up'}</h2>
             <p>${completed} reviewed · ${snoozed} snoozed</p>
-            <p class="help">${snoozed ? 'Snoozed items are still waiting in WaniKani.' : 'Your completed reviews are saved to WaniKani.'}</p>
-            <button class="primary" onClick=${() => setReload(value => value + 1)}>Check for more reviews</button>
+            <p class="help">${pending.length ? 'Your answers are complete; some reviews are still unsaved.' : snoozed ? 'Snoozed items are still waiting in WaniKani.' : 'Your completed reviews are saved to WaniKani.'}</p>
+            <button class="primary" disabled=${pending.length > 0} onClick=${() => setReload(value => value + 1)}>Check for more reviews</button>
+          </section>
+        `}
+        ${pending.length > 0 && html`
+          <section class="save-status" aria-label="Review saves">
+            ${savingCount > 0 && html`<p role="status">Saving ${savingCount} review${savingCount === 1 ? '' : 's'}…</p>`}
+            ${pending.filter(entry => entry.error).map(entry => html`
+              <div key=${entry.item.assignment.id}>
+                <p class="error" role="alert">${entry.item.subject.data.characters || meaningDetails(entry.item.subject).primary}: ${entry.error}</p>
+                <button type="button" onClick=${() => save(entry.item, true)}>Retry save</button>
+              </div>
+            `)}
+            <p class="help">Keep this page open until all reviews are saved.</p>
           </section>
         `}
       </main>

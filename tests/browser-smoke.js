@@ -47,6 +47,16 @@ async (page) => {
     Math.random = () => 0.999999;
   });
   let firstSave = true;
+  let releaseFirstSave;
+  const firstSaveGate = new Promise(resolve => { releaseFirstSave = resolve; });
+  let releaseRadicalSave;
+  const radicalSaveGate = new Promise(resolve => { releaseRadicalSave = resolve; });
+  let firstRadicalSave = true;
+  const warnsBeforeLeaving = () => page.evaluate(() => {
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
   let detailFetches = 0;
   await page.route('https://cdn.wanikani.com/**', route => route.fulfill({
     contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path stroke="white" stroke-width="10" d="M10 50h80"/></svg>',
@@ -62,6 +72,13 @@ async (page) => {
       writes.push(review);
       if (firstSave) {
         firstSave = false;
+        await firstSaveGate;
+        await route.fulfill({ status: 500, json: { error: 'Temporary failure' } });
+        return;
+      }
+      if (review.assignment_id === 14 && firstRadicalSave) {
+        firstRadicalSave = false;
+        await radicalSaveGate;
         await route.fulfill({ status: 500, json: { error: 'Temporary failure' } });
         return;
       }
@@ -150,10 +167,15 @@ async (page) => {
   await page.getByRole('button', { name: 'Backspace', exact: true }).click();
   assert(await page.getByLabel('Your reading').inputValue() === 'かこう', 'Middle backspace failed');
   await page.getByLabel('Your reading').fill('いち');
-  await page.getByRole('button', { name: 'Check reading', exact: true }).click();
-  await page.getByRole('button', { name: 'Retry save', exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Retry save', exact: true }).click();
+  await page.getByRole('button', { name: 'Check reading', exact: true }).evaluate(button => { button.click(); button.click(); });
   await page.getByText('学校', { exact: true }).waitFor();
+  assert(writes.length === 1, 'Next review must appear before the save returns, without a duplicate write');
+  assert(await warnsBeforeLeaving(), 'Pending saves must warn before leaving the page');
+  releaseFirstSave();
+  await page.getByRole('button', { name: 'Retry save', exact: true }).waitFor();
+  assert(await page.getByRole('button', { name: 'Show meaning', exact: true }).isEnabled(), 'Failed saves must not block the current review');
+  await page.getByRole('button', { name: 'Retry save', exact: true }).evaluate(button => { button.click(); button.click(); });
+  await page.getByRole('region', { name: 'Review saves', exact: true }).waitFor({ state: 'detached' });
   assert(writes.length === 2, 'Unexpected duplicate save');
   assert(writes[1].incorrect_meaning_answers === 0 && writes[1].incorrect_reading_answers === 0, 'Retry must not commit pending mistakes');
   assert(await page.getByRole('button', { name: 'Show details for 学', exact: true }).count() === 0, 'Vocabulary kanji must stay unrevealed before Show');
@@ -202,8 +224,21 @@ async (page) => {
   assert(writes.length === 3, 'Incorrect meaning must not submit an unfinished review');
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
   await page.getByRole('button', { name: 'Correct', exact: true }).click();
+  await page.getByRole('heading', { name: 'Answers complete', exact: true }).waitFor();
+  await page.getByText('Saving 1 review…', { exact: true }).waitFor();
+  assert(writes.length === 4, 'Multiple reviews must save independently while earlier writes are pending');
+  assert(await page.getByRole('heading', { name: 'Session complete', exact: true }).count() === 0, 'Session must not claim success with an unconfirmed save');
+  assert(await page.getByRole('button', { name: 'Check for more reviews', exact: true }).isDisabled(), 'Starting another session must not discard pending saves');
+  assert(await warnsBeforeLeaving(), 'The last pending save must keep the unload warning active');
+  releaseRadicalSave();
+  await page.getByRole('button', { name: 'Retry save', exact: true }).waitFor();
+  assert(await page.getByRole('heading', { name: 'Session complete', exact: true }).count() === 0, 'A failed final save must not be called complete');
+  assert(await page.getByRole('button', { name: 'Check for more reviews', exact: true }).isDisabled(), 'Failed saves must be retained before starting a new session');
+  await page.getByRole('button', { name: 'Retry save', exact: true }).click();
   await page.getByRole('heading', { name: 'Session complete' }).waitFor();
-  assert(writes.length === 4, 'Snoozed item was written or completed item was lost');
+  await page.getByRole('region', { name: 'Review saves', exact: true }).waitFor({ state: 'detached' });
+  assert(!await warnsBeforeLeaving(), 'Saved sessions must not keep warning on unload');
+  assert(writes.length === 5, 'Snoozed item was written or completed item was lost');
   assert(writes[3].incorrect_meaning_answers === 1, 'Deferring lost the meaning mistake');
   assert(!writes.some(review => review.assignment_id === 13), 'Snoozed assignment submitted');
   assert(await page.getByText('3 reviewed · 1 snoozed', { exact: true }).count() === 1, 'Session counts are wrong');
@@ -218,7 +253,7 @@ async (page) => {
   await page.getByRole('button', { name: 'Incorrect', exact: true }).click();
   await page.getByText('学校', { exact: true }).waitFor();
   assert(await page.locator('.failure-panel').count() === 0, 'Incorrect meaning must advance directly to the next item');
-  assert(writes.length === 4, 'Deferring a meaning must not write to WaniKani');
+  assert(writes.length === 5, 'Deferring a meaning must not write to WaniKani');
   await page.goto('http://localhost:5173/');
   await page.getByRole('heading', { name: 'Missing API key', exact: true }).waitFor();
   assert(await page.locator('input').count() === 0, 'Missing query parameter must not introduce a key-entry form');

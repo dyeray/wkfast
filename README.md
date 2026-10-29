@@ -32,7 +32,8 @@ Installation is local to `node_modules/`. The postinstall script copies Preact, 
 - **Snooze:** excludes the entire item for this session. It makes no change to WaniKani.
 - **Incorrect reading:** the failure remains pending and the answer stays hidden until you tap **Show**. The square **→** button commits that mistake and queues the reading for later. **↻** retries immediately without recording the pending mistake. Earlier committed mistakes and the passed meaning are preserved. Neither button submits an unfinished review.
 - A review is submitted only after every required part is answered correctly. Mistake counts are sent separately for meaning and reading. Radicals and kana vocabulary require meaning only.
-- A failed save keeps the completed item on screen. **Retry save** first checks the assignment's status so a timed-out successful save is not sent again.
+- Completing an item immediately advances to the next one while its combined meaning/reading result saves in the background. A save status below the current review retains any failures with **Retry save**; retries first check the assignment's status so a timed-out successful save is not sent again.
+- The session shows **Answers complete** until all saves are confirmed. **Session complete** means everything has been saved. Starting another session is disabled while any save is pending or failed, and the page requests a browser warning before leaving with unsaved reviews.
 
 ## Host statically
 
@@ -62,7 +63,7 @@ Tests use Node's built-in runner and do not need npm dependencies. `tests/browse
 
 ## Limits
 
-Session state stays in memory and the key comes only from the URL. Reloading starts a new session using that query parameter; unfinished answers, their mistake counts, and snoozes are lost. Completed reviews already acknowledged by WaniKani remain saved. There is no offline queue, lessons, or persistent login. Avoid reviewing the same item in multiple clients at once.
+Session state and pending saves stay in memory and the key comes only from the URL. Keep the page open until all reviews are saved. Closing or reloading can lose unfinished answers, their mistake counts, snoozes, and unconfirmed saves; browser leave warnings cannot protect against every mobile shutdown or forced close. Reviews already acknowledged by WaniKani remain saved. There is no persistent offline queue, lessons, or persistent login. Avoid reviewing the same item in multiple clients at once.
 
 The API key is visible in the URL and may appear in browser history and hosting access logs. Treat the URL as a credential.
 

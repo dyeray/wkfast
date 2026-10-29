@@ -20,7 +20,7 @@ React with Vite would provide JSX compilation and bundling, but those are unnece
 2. Fetch due, started, visible assignments and their subjects, handling pagination. Include kanji, vocabulary, radicals, and kana vocabulary; only request readings for subjects that have them. Show image-only radicals using their WaniKani image.
 3. Present one item with large text and thumb-friendly controls. Show meaning first: **Show**, then **Correct** or **Incorrect**. **Incorrect** immediately counts one meaning mistake and advances to the next item, queuing the missed meaning for later. There is no failure panel or extra confirmation for meanings.
 4. For reading, enter kana using a radial flick keypad: hold a consonant row, drag toward a kana, and release, or tap the row then an option. The usual vowel layout is a in the center, i left, u up, e right, o down. Include voiced and semi-voiced rows, small kana, ん, the long-vowel mark, backspace, and clear. Allow desktop physical keyboard input, but suppress the reading field's software keyboard using `inputmode="none"` and a read-only field on touch-first devices. The custom keyboard still changes its value. Check only readings marked `accepted_answer`, normalizing Unicode and katakana to hiragana. A wrong reading creates a pending failure with its answer concealed until **Show** is clicked. Square **→** counts the mistake and queues the reading for later; **↻** retries immediately without counting the pending mistake. Both preserve earlier committed mistakes and the passed meaning. A listed but nonaccepted reading only shakes the input with a generic retry notice: no answer revelation, no mistake, no acknowledgement step, and no vibration.
-5. Submit one review once all required parts have been answered correctly, with this session's meaning and reading mistake counts. Disable repeated submission while saving. Advance only after WaniKani acknowledges success.
+5. Once all required parts have been answered correctly, immediately advance and save one combined review in the background with this session's meaning and reading mistake counts. The session owns pending saves so they survive item changes. Guard duplicate completion and retry clicks. Keep failed saves visible with retry actions while allowing further reviews. Show **Answers complete** while any save is pending or failed and **Session complete** only after every save is acknowledged. Disable starting another session until saves finish and request a browser leave warning while anything remains unsaved.
 6. **Snooze** removes the whole item from this session without submitting a review. Snoozes disappear on reload.
 7. Show a simple completed count and an end-of-session message.
 
@@ -32,11 +32,11 @@ Revealed meanings show the primary meaning and accepted alternatives, including 
 
 ## Errors and credentials
 
-Show actionable authentication, permission, rate-limit, loading, and saving errors. Keep an unsaved completed item on screen with a retry action. Before retrying an ambiguous failed submission, check whether its assignment is still due to avoid submitting it twice.
+Show actionable authentication, permission, rate-limit, loading, and saving errors. Keep unsaved completed items in the session's in-memory pending list with retry actions. Before retrying an ambiguous failed submission, check whether its assignment is still due to avoid submitting it twice.
 
 Use an API token allowed to create reviews. Do not log tokens, save credentials in browser storage, use analytics, or load third-party scripts. Set a no-referrer policy. The token stays in the query string as requested, so the URL itself is a credential and can appear in browser history and hosting logs.
 
-Reloading loses unfinished answers and their mistake counts. Previously submitted reviews remain in WaniKani. No offline queue or resume mechanism is included.
+Reloading loses unfinished answers, their mistake counts, and unconfirmed saves. Previously acknowledged reviews remain in WaniKani. Keep the page open until all saves finish; leave warnings are best effort and cannot prevent every mobile shutdown. No persistent offline queue or resume mechanism is included.
 
 ## Files and checks
 

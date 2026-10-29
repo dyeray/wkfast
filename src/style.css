@@ -94,7 +94,7 @@ main { flex: 1; }
 .accepted-answer { margin: 16px 0 0; font-size: 25px; text-align: center; }
 .failure-actions { display: flex; justify-content: center; gap: 12px; margin-top: 16px; }
 .square-action { display: grid; place-items: center; width: 56px; height: 56px; padding: 0; border-radius: 4px; font-size: 28px; }
-.save-status { padding: 28px 0; text-align: center; }
+.save-status { margin-top: 16px; border-top: 1px solid var(--border); padding: 16px 0; text-align: center; }
 .error { color: #a01820; font-size: 14px; }
 .session-message { text-align: center; padding: 76px 0 32px; }
 .session-message > .text-button { margin-top: 12px; }
