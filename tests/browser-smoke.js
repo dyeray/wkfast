@@ -182,7 +182,16 @@ async (page) => {
   await page.getByRole('button', { name: 'Snooze', exact: true }).click();
   await page.getByRole('img', { name: 'Radical to review', exact: true }).waitFor();
   assert(await page.getByRole('img').getAttribute('alt') === 'Radical to review', 'Image alt leaks meaning');
+  assert(await page.getByRole('button', { name: 'Show radical details', exact: true }).count() === 0, 'Radical details must remain hidden before Show');
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
+  await page.getByRole('button', { name: 'Show radical details', exact: true }).click();
+  const radicalDetails = page.getByRole('dialog', { name: 'Ground radical details', exact: true });
+  await radicalDetails.getByText('Ground', { exact: true }).waitFor();
+  assert(await radicalDetails.getByRole('img', { name: 'Ground radical', exact: true }).count() === 1, 'Image radical must also appear in its popup');
+  assert(await radicalDetails.getByText('Radicals do not have readings.', { exact: true }).count() === 1, 'Radicals must not invent kanji readings');
+  assert(detailFetches === 3 && writes.length === 2, 'Radical popup must reuse its subject and preserve the review');
+  await radicalDetails.getByRole('button', { name: 'Close radical details', exact: true }).click();
+  await radicalDetails.waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Correct', exact: true }).click();
   await page.getByText('ありがとう', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
@@ -245,6 +254,30 @@ async (page) => {
     await phone.getByRole('button', { name: 'か', exact: true }).focus();
     await phone.getByRole('button', { name: 'か', exact: true }).press('Enter');
     assert(await input.inputValue() === 'いちか', 'Keyboard activation must still select a kana once');
+    await phone.unroute('https://api.wanikani.com/v2/**');
+    let radical;
+    await phone.route('https://api.wanikani.com/v2/**', route => route.fulfill({ json: {
+      data: new URL(route.request().url()).pathname.endsWith('/assignments') ? [assignments[2]] : [radical],
+      pages: { next_url: null },
+    } }));
+    await phone.route('https://cdn.wanikani.com/**', route => route.fulfill({
+      contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path stroke="white" stroke-width="10" d="M10 50h80"/></svg>',
+    }));
+    for (const characters of [null, '一']) {
+      radical = { ...subjects[2], data: { ...subjects[2].data, characters } };
+      await phone.goto('http://localhost:5173/?api_key=smoke-test-token');
+      const trigger = phone.getByRole('button', { name: characters ? 'Show details for 一' : 'Show radical details', exact: true });
+      await phone.getByRole('button', { name: 'Show meaning', exact: true }).waitFor();
+      assert(await trigger.count() === 0, 'Touch radical details must stay hidden before revealing');
+      await phone.getByRole('button', { name: 'Show meaning', exact: true }).tap();
+      await trigger.tap();
+      const details = phone.getByRole('dialog', { name: `${characters || 'Ground'} radical details`, exact: true });
+      await details.getByText('Ground', { exact: true }).waitFor();
+      assert(await details.getByText('On’yomi', { exact: true }).count() === 0, 'Radical popup must not show kanji-only reading labels');
+      await details.getByRole('button', { name: 'Close radical details', exact: true }).tap();
+      await details.waitFor({ state: 'detached' });
+      assert(await phone.getByText('0 mistakes', { exact: true }).count() === 1, 'Closing radical details must preserve grading state');
+    }
   } finally {
     await phoneContext.close();
   }

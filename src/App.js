@@ -38,6 +38,7 @@ function Review({ initialItem, api, onDone, onNext }) {
   const caret = useRef(null);
   const { subject, phase, feedback } = item;
   const image = subject.data.character_images?.find(image => image.content_type === 'image/svg+xml');
+  const radicalImage = image && html`<img src=${image.url} alt="Radical to review" referrerPolicy="no-referrer" />`;
   const meanings = meaningDetails(subject);
   const readings = subject.data.readings?.filter(reading => reading.accepted_answer).map(reading => reading.reading).join(' / ');
 
@@ -126,11 +127,14 @@ function Review({ initialItem, api, onDone, onNext }) {
       <div class=${`subject ${subject.object}`}>
         ${subject.data.characters
           ? html`<div class="characters" lang="ja"><span>${Array.from(subject.data.characters).map(character =>
-              item.revealed && (subject.object === 'kanji' || (subject.object === 'vocabulary' && /\p{Unified_Ideograph}/u.test(character)))
+              item.revealed && (['kanji', 'radical'].includes(subject.object) || (subject.object === 'vocabulary' && /\p{Unified_Ideograph}/u.test(character)))
                 ? html`<button class="kanji-character" type="button" aria-label=${`Show details for ${character}`} aria-haspopup="dialog"
                     onClick=${() => setSelectedKanji(character)}>${character}</button>` : character
             )}</span></div>`
-          : html`<div class="characters"><img src=${image.url} alt="Radical to review" referrerPolicy="no-referrer" /></div>`}
+          : html`<div class="characters">${item.revealed
+              ? html`<button class="kanji-character" type="button" aria-label="Show radical details" aria-haspopup="dialog"
+                  onClick=${() => setSelectedKanji(meanings.primary)}>${radicalImage}</button>`
+              : radicalImage}</div>`}
       </div>
 
       <div class=${`question-type ${phase === 'reading' ? 'reading' : 'meaning'}`}>
