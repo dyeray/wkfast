@@ -28,6 +28,8 @@ Completing meaning and reading together limits partially finished work if the br
 
 Use WaniKani-style subject backgrounds (blue radical, pink kanji, purple vocabulary), white meaning prompts, and dark reading prompts. Keep the original self-grading meaning flow and independent client branding.
 
+The subject starts at the top without a branding header or footer. The review footer shows only `done/total/mistakes` beside Snooze: answered items including pending saves, the original loaded session size, and the current item's committed mistakes. Deferred items do not inflate the total, and snoozes do not count as done. The HTML root starts empty so no static startup placeholder remains after rendering.
+
 Revealed meanings show the primary meaning and accepted alternatives, including whitelisted auxiliary meanings. Only while an answer is revealed, radicals and kanji in the displayed subject become tappable, including image-only radicals. A native modal dialog shows meanings and, for kanji, separately labeled on’yomi and kun’yomi, including nonaccepted dictionary readings. Radicals show their character or image and a note that they have no readings. Vocabulary kanji are looked up individually through WaniKani's subject filter; current radical and kanji subjects reuse their data. Handle lookup failures with a retry inside the dialog and keep successful lookups in memory only. Closing the dialog restores focus and preserves the review, input, and mistake counts.
 
 ## Errors and credentials

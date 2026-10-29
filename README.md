@@ -24,6 +24,7 @@ Installation is local to `node_modules/`. The postinstall script copies Preact, 
 ## Review
 
 - Each session shuffles the due reviews. The order stays fixed while you work through that session.
+- The compact review footer shows `done/total/mistakes`: completed items (including pending saves), the original session total, and this item's committed mistakes. Deferring an item does not increase the total; snoozed items do not count as done.
 - **Meaning:** think of the answer, tap **Show meaning**, then **Correct** or **Incorrect**. **Incorrect** immediately records one meaning mistake and moves to the next item, queuing the missed meaning for later without a retry/next screen.
 - Revealed meanings show the main meaning and accepted alternatives, including WaniKani's whitelisted auxiliary meanings.
 - **Subject details:** after revealing an answer, tap a radical or kanji to open its meanings. Kanji also show separate on’yomi/kun’yomi readings; radicals have no readings. Image-only radicals are tappable too, and vocabulary kanji open individually. Close the popup with **Close**, Escape, or a tap outside it. Details are fetched as needed and cached only in memory; opening them never submits a review.

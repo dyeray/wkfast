@@ -24,7 +24,7 @@ function FailedAnswer({ revealed, value, lang, onShow, onNext, onRetry }) {
   `;
 }
 
-function Review({ initialItem, api, onDone, onNext }) {
+function Review({ initialItem, api, done, total, onDone, onNext }) {
   const [item, dispatch] = useReducer(reviewReducer, initialItem);
   const [input, setInput] = useState('');
   const [composing, setComposing] = useState(false);
@@ -161,7 +161,7 @@ function Review({ initialItem, api, onDone, onNext }) {
       `}
 
       <div class="review-footer">
-        <span>${item.mistakes.meaning + item.mistakes.reading} mistakes</span>
+        <span role="status" aria-label=${`${done} done, ${total} total, ${item.mistakes.meaning + item.mistakes.reading} mistakes`}>${done}/${total}/${item.mistakes.meaning + item.mistakes.reading}</span>
         <button class="text-button snooze" onClick=${snooze} disabled=${phase === 'ready'}>Snooze</button>
       </div>
       ${selectedKanji && html`<${KanjiDetails} character=${selectedKanji} subject=${subject} api=${api} onClose=${() => setSelectedKanji(null)} />`}
@@ -172,6 +172,7 @@ function Review({ initialItem, api, onDone, onNext }) {
 export function App({ initialToken = '' }) {
   const [api] = useState(() => initialToken ? createApi(initialToken) : null);
   const [items, setItems] = useState(null);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
   const [cursor, setCursor] = useState(0);
@@ -195,7 +196,7 @@ export function App({ initialToken = '' }) {
     setError('');
     api.loadReviews().then(reviews => {
       if (!active) return;
-      setCursor(0); setCompleted(0); setSnoozed(0); setItems(shuffleReviews(reviews));
+      setCursor(0); setCompleted(0); setSnoozed(0); setTotal(reviews.length); setItems(shuffleReviews(reviews));
     }).catch(error => { if (active) setError(error.message); });
     return () => { active = false; };
   }, [api, reload]);
@@ -229,10 +230,6 @@ export function App({ initialToken = '' }) {
 
   return html`
     <div class="app-shell">
-      <header class="app-header">
-        <h1>WK<span>Fast</span><span class="brand-dot" aria-hidden="true"></span></h1>
-        <span class="session-progress" aria-live="polite">${api && items ? `${completed + pending.length} done · ${items.length - cursor} left` : 'Reviews, simplified.'}</span>
-      </header>
       <main>
         ${!api ? html`
           <section class="session-message">
@@ -248,7 +245,8 @@ export function App({ initialToken = '' }) {
         ` : !items ? html`
           <section class="session-message" role="status"><div class="loading-dot" aria-hidden="true"></div><h2>Getting your reviews…</h2><p>A moment to settle in.</p></section>
         ` : cursor < items.length ? html`
-          <${Review} key=${`${cursor}:${items[cursor].assignment.id}`} initialItem=${items[cursor]} api=${api} onDone=${advance} onNext=${next} />
+          <${Review} key=${`${cursor}:${items[cursor].assignment.id}`} initialItem=${items[cursor]} api=${api}
+            done=${completed + pending.length} total=${total} onDone=${advance} onNext=${next} />
         ` : html`
           <section class="session-message complete">
             ${!pending.length && html`<div class="complete-mark" aria-hidden="true">✓</div><p class="eyebrow">A good place to pause.</p>`}
@@ -271,7 +269,6 @@ export function App({ initialToken = '' }) {
           </section>
         `}
       </main>
-      <footer class="app-footer">Independent client for WaniKani.</footer>
     </div>
   `;
 }

@@ -99,6 +99,12 @@ async (page) => {
   });
   await page.goto('http://localhost:5173/?api_key=smoke-test-token');
   await page.getByRole('button', { name: 'Show meaning', exact: true }).waitFor();
+  assert(await page.getByRole('banner').count() === 0, 'The review header must not consume screen space');
+  assert(await page.getByRole('contentinfo').count() === 0, 'The independent-client footer must be removed');
+  assert(await page.getByText('Loading WKFast…', { exact: true }).count() === 0, 'Startup placeholder must not remain after the app loads');
+  assert(await page.getByText('0/4/0', { exact: true }).count() === 1, 'Footer must show done/total/current-item mistakes');
+  assert(await page.getByRole('status', { name: '0 done, 4 total, 0 mistakes', exact: true }).count() === 1, 'Compact progress must retain descriptive accessible names');
+  assert((await page.locator('.subject').boundingBox()).y === 0, 'The subject should start at the top of the viewport');
   assert(new URL(page.url()).searchParams.get('api_key') === 'smoke-test-token', 'Query key must remain available for refresh');
   assert(await page.locator('input[type="password"]').count() === 0, 'No API-key entry form should exist');
   assert(await page.getByText('Unity', { exact: true }).count() === 0, 'Alternative meanings must remain hidden before Show');
@@ -120,7 +126,7 @@ async (page) => {
   assert(await page.getByRole('button', { name: 'Show details for 一', exact: true }).count() === 0, 'Details must be hidden again during the unanswered reading');
   const contextMenus = await page.getByRole('button', { name: 'は row', exact: true }).evaluate(button => ({
     keyboard: !button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })),
-    outside: document.querySelector('h1').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })),
+    outside: document.querySelector('.question-type').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })),
   }));
   assert(contextMenus.keyboard && contextMenus.outside, 'Context menus must be suppressed only inside the keyboard');
   assert(await page.getByLabel('Your reading').evaluate(input => input.inputMode) === 'none', 'Reading input must suppress the software keyboard');
@@ -169,6 +175,7 @@ async (page) => {
   await page.getByLabel('Your reading').fill('いち');
   await page.getByRole('button', { name: 'Check reading', exact: true }).evaluate(button => { button.click(); button.click(); });
   await page.getByText('学校', { exact: true }).waitFor();
+  assert(await page.getByText('1/4/0', { exact: true }).count() === 1, 'Background saves must count as done immediately');
   assert(writes.length === 1, 'Next review must appear before the save returns, without a duplicate write');
   assert(await warnsBeforeLeaving(), 'Pending saves must warn before leaving the page');
   releaseFirstSave();
@@ -220,7 +227,7 @@ async (page) => {
   await page.getByRole('button', { name: 'Incorrect', exact: true }).click();
   await page.getByRole('button', { name: 'Show meaning', exact: true }).waitFor();
   assert(await page.locator('.failure-panel').count() === 0, 'Meaning grading must skip the reading failure panel');
-  assert(await page.getByText('1 mistakes', { exact: true }).count() === 1, 'Incorrect meaning must count immediately');
+  assert(await page.getByText('2/4/1', { exact: true }).count() === 1, 'Meaning deferral must record a mistake without inflating the session total');
   assert(writes.length === 3, 'Incorrect meaning must not submit an unfinished review');
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
   await page.getByRole('button', { name: 'Correct', exact: true }).click();
@@ -252,6 +259,7 @@ async (page) => {
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
   await page.getByRole('button', { name: 'Incorrect', exact: true }).click();
   await page.getByText('学校', { exact: true }).waitFor();
+  assert(await page.getByText('0/4/0', { exact: true }).count() === 1, 'Deferring a meaning must keep the original total and leave done unchanged');
   assert(await page.locator('.failure-panel').count() === 0, 'Incorrect meaning must advance directly to the next item');
   assert(writes.length === 5, 'Deferring a meaning must not write to WaniKani');
   await page.goto('http://localhost:5173/');
@@ -311,7 +319,7 @@ async (page) => {
       assert(await details.getByText('On’yomi', { exact: true }).count() === 0, 'Radical popup must not show kanji-only reading labels');
       await details.getByRole('button', { name: 'Close radical details', exact: true }).tap();
       await details.waitFor({ state: 'detached' });
-      assert(await phone.getByText('0 mistakes', { exact: true }).count() === 1, 'Closing radical details must preserve grading state');
+      assert(await phone.getByText('0/1/0', { exact: true }).count() === 1, 'Closing radical details must preserve grading state');
     }
   } finally {
     await phoneContext.close();
