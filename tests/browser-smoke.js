@@ -63,9 +63,6 @@ async (page) => {
   assert(new URL(page.url()).searchParams.get('api_key') === 'smoke-test-token', 'Query key must remain available for refresh');
   assert(await page.locator('input[type="password"]').count() === 0, 'No API-key entry form should exist');
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
-  await page.getByRole('button', { name: 'Incorrect', exact: true }).click();
-  await page.getByRole('button', { name: 'Retry review', exact: true }).click();
-  await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
   await page.getByRole('button', { name: 'Correct', exact: true }).click();
   const contextMenus = await page.getByRole('button', { name: 'は row', exact: true }).evaluate(button => ({
     keyboard: !button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })),
@@ -130,12 +127,10 @@ async (page) => {
   await page.getByText('ありがとう', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
   await page.getByRole('button', { name: 'Incorrect', exact: true }).click();
-  assert(await page.locator('.accepted-answer').count() === 0, 'Failed meaning must remain hidden');
-  await page.getByRole('button', { name: 'Show', exact: true }).click();
-  assert(await page.locator('.accepted-answer').textContent() === 'Thank you', 'Show must reveal the correct meaning');
-  await page.getByRole('button', { name: 'Next review', exact: true }).click();
   await page.getByRole('button', { name: 'Show meaning', exact: true }).waitFor();
-  assert(writes.length === 3, 'Next must not submit an unfinished review');
+  assert(await page.locator('.failure-panel').count() === 0, 'Meaning grading must skip the reading failure panel');
+  assert(await page.getByText('1 mistakes', { exact: true }).count() === 1, 'Incorrect meaning must count immediately');
+  assert(writes.length === 3, 'Incorrect meaning must not submit an unfinished review');
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
   await page.getByRole('button', { name: 'Correct', exact: true }).click();
   await page.getByRole('heading', { name: 'Session complete' }).waitFor();
@@ -150,6 +145,11 @@ async (page) => {
   assert(errors.length === 0, errors.join('\n'));
   await page.reload();
   await page.getByRole('button', { name: 'Show meaning', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
+  await page.getByRole('button', { name: 'Incorrect', exact: true }).click();
+  await page.getByText('学校', { exact: true }).waitFor();
+  assert(await page.locator('.failure-panel').count() === 0, 'Incorrect meaning must advance directly to the next item');
+  assert(writes.length === 4, 'Deferring a meaning must not write to WaniKani');
   await page.goto('http://localhost:5173/');
   await page.getByRole('heading', { name: 'Missing API key', exact: true }).waitFor();
   assert(await page.locator('input').count() === 0, 'Missing query parameter must not introduce a key-entry form');

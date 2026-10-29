@@ -66,6 +66,11 @@ function Review({ initialItem, api, onDone, onNext }) {
   function answer(action) {
     if (busy.current || leaving.current) return;
     const next = reviewReducer(item, action);
+    if (action.type === 'meaning' && !action.correct && next !== item) {
+      leaving.current = true;
+      onNext(next);
+      return;
+    }
     dispatch(action);
     if (action.type === 'reading' && next.feedback === 'retry') {
       field.current.classList.remove('shake');
@@ -108,8 +113,8 @@ function Review({ initialItem, api, onDone, onNext }) {
   }
 
   const failure = feedback === 'incorrect' && html`
-    <${FailedAnswer} revealed=${item.revealed} value=${phase === 'reading' ? readings : meanings}
-      lang=${phase === 'reading' ? 'ja' : 'en'} onShow=${() => answer({ type: 'show' })}
+    <${FailedAnswer} revealed=${item.revealed} value=${readings}
+      lang="ja" onShow=${() => answer({ type: 'show' })}
       onNext=${next} onRetry=${() => { setInput(''); answer({ type: 'retry' }); }} />
   `;
 
@@ -126,11 +131,11 @@ function Review({ initialItem, api, onDone, onNext }) {
       </div>
 
       ${phase === 'meaning' && html`
-        ${feedback !== 'incorrect' && html`<div class="meaning-answer" aria-live="polite">
+        <div class="meaning-answer" aria-live="polite">
           <p class="eyebrow">Meaning</p>
           <p class=${item.revealed ? 'answer' : 'prompt'}>${item.revealed ? meanings : 'Think of the meaning.'}</p>
-        </div>`}
-        ${feedback === 'incorrect' ? failure : item.revealed ? html`
+        </div>
+        ${item.revealed ? html`
           <div class="grading">
             <button class="incorrect" onClick=${() => answer({ type: 'meaning', correct: false })}>Incorrect</button>
             <button class="primary" onClick=${() => answer({ type: 'meaning', correct: true })}>Correct</button>

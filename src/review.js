@@ -46,7 +46,7 @@ export function reviewReducer(item, action) {
       const hasReading = ['kanji', 'vocabulary'].includes(item.subject.object);
       return { ...item, phase: hasReading ? 'reading' : 'ready', revealed: false };
     }
-    return { ...item, feedback: 'incorrect', revealed: false };
+    return { ...item, revealed: false, mistakes: { ...item.mistakes, meaning: item.mistakes.meaning + 1 } };
   }
   if (action.type === 'reading' && item.phase === 'reading') {
     const result = checkReading(item.subject, action.value);

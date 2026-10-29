@@ -24,11 +24,11 @@ Installation is local to `node_modules/`. The postinstall script copies Preact, 
 ## Review
 
 - Each session shuffles the due reviews. The order stays fixed while you work through that session.
-- **Meaning:** think of the answer, tap **Show meaning**, then **Correct** or **Incorrect**. Missed meanings are tried again.
+- **Meaning:** think of the answer, tap **Show meaning**, then **Correct** or **Incorrect**. **Incorrect** immediately records one meaning mistake and moves to the next item, queuing the missed meaning for later without a retry/next screen.
 - **Reading:** hold a kana row and flick toward an option, or tap the row and then an option on its radial menu. Browser context menus and text selection are suppressed inside the kana keyboard. Vowels use the Japanese layout: a in the center, i left, u up, e right, o down. Voiced rows, small kana, ん, and ー are included. The reading input suppresses the software keyboard and is read-only on touch-first devices; the custom keyboard updates it directly. Desktop physical keyboard entry remains available. **Check reading** accepts WaniKani's accepted readings, with katakana converted to hiragana. A listed but nonaccepted reading only shakes the input and lets you retry: no answer revealed, no mistake counted, and no vibration.
 - **Review colors:** radicals are blue, kanji pink, and vocabulary purple. Meaning prompts use a white bar; reading prompts use a dark bar.
 - **Snooze:** excludes the entire item for this session. It makes no change to WaniKani.
-- **Incorrect:** the failure remains pending and the answer stays hidden until you tap **Show**. The square **→** button commits that mistake and queues the failed part for later. **↻** retries immediately without recording the pending mistake. Earlier committed mistakes and any already-passed part are preserved. Neither button submits an unfinished review.
+- **Incorrect reading:** the failure remains pending and the answer stays hidden until you tap **Show**. The square **→** button commits that mistake and queues the reading for later. **↻** retries immediately without recording the pending mistake. Earlier committed mistakes and the passed meaning are preserved. Neither button submits an unfinished review.
 - A review is submitted only after every required part is answered correctly. Mistake counts are sent separately for meaning and reading. Radicals and kana vocabulary require meaning only.
 - A failed save keeps the completed item on screen. **Retry save** first checks the assignment's status so a timed-out successful save is not sent again.
 

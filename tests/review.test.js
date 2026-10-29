@@ -43,19 +43,30 @@ test('meanings must be shown and both required parts passed before submitting', 
   });
 });
 
-test('incorrect answers stay pending until next commits their mistake counts', () => {
-  let item = act(createItem(assignment, kanji), 'show');
-  item = act(item, 'meaning', { correct: false });
-  assert.equal(item.feedback, 'incorrect');
-  assert.equal(item.mistakes.meaning, 0);
-  assert.equal(act(item, 'meaning', { correct: false }), item);
-  item = act(item, 'retry');
-  assert.equal(item.revealed, false);
-  assert.equal(item.mistakes.meaning, 0);
-  item = act(act(item, 'show'), 'meaning', { correct: false });
-  item = act(item, 'next');
-  assert.equal(item.mistakes.meaning, 1);
-  item = act(act(item, 'show'), 'meaning', { correct: true });
+test('incorrect meanings count once and can be deferred without a pending failure', () => {
+  for (const object of ['kanji', 'vocabulary', 'radical', 'kana_vocabulary']) {
+    const original = act(createItem(assignment, { ...kanji, object }), 'show');
+    const failed = act(original, 'meaning', { correct: false });
+    assert.equal(original.mistakes.meaning, 0);
+    assert.equal(failed.phase, 'meaning');
+    assert.equal(failed.feedback, null);
+    assert.equal(failed.revealed, false);
+    assert.equal(failed.mistakes.meaning, 1);
+    assert.equal(act(failed, 'meaning', { correct: false }), failed);
+    const other = createItem({ ...assignment, id: 13 }, kanji);
+    const queue = deferReview([original, other], failed);
+    assert.equal(queue[1], other);
+    let item = queue[2];
+    assert.equal(item.mistakes.meaning, 1);
+    assert.throws(() => reviewPayload(item), /complete/i);
+    item = act(act(item, 'show'), 'meaning', { correct: true });
+    if (['kanji', 'vocabulary'].includes(object)) item = act(item, 'reading', { value: 'いち' });
+    assert.equal(reviewPayload(item).review.incorrect_meaning_answers, 1);
+  }
+});
+
+test('incorrect readings stay pending until next commits their mistake counts', () => {
+  let item = act(act(createItem(assignment, kanji), 'show'), 'meaning', { correct: true });
   item = act(item, 'reading', { value: 'いぬ' });
   assert.equal(item.feedback, 'incorrect');
   assert.equal(item.mistakes.reading, 0);
@@ -66,19 +77,12 @@ test('incorrect answers stay pending until next commits their mistake counts', (
   item = act(item, 'retry');
   item = act(item, 'reading', { value: 'イチ' });
   assert.deepEqual(reviewPayload(item).review, {
-    assignment_id: 12, incorrect_meaning_answers: 1, incorrect_reading_answers: 1,
+    assignment_id: 12, incorrect_meaning_answers: 0, incorrect_reading_answers: 1,
   });
 });
 
-test('show reveals a pending failure and retry discards it without recording a mistake', () => {
-  let item = act(act(createItem(assignment, kanji), 'show'), 'meaning', { correct: false });
-  assert.equal(item.revealed, false);
-  item = act(item, 'show');
-  assert.equal(item.revealed, true);
-  item = act(item, 'retry');
-  assert.equal(item.revealed, false);
-  assert.equal(item.mistakes.meaning, 0);
-  item = act(act(item, 'show'), 'meaning', { correct: true });
+test('show reveals a pending reading failure and retry discards it without recording a mistake', () => {
+  let item = act(act(createItem(assignment, kanji), 'show'), 'meaning', { correct: true });
   item = act(item, 'reading', { value: 'いぬ' });
   assert.equal(item.revealed, false);
   item = act(item, 'show');
@@ -92,15 +96,11 @@ test('retry preserves earlier committed mistakes and next cannot commit the same
   let item = createItem(assignment, kanji);
   for (let count = 1; count <= 2; count++) {
     item = act(act(item, 'show'), 'meaning', { correct: false });
-    item = act(item, 'next');
     assert.equal(item.mistakes.meaning, count);
-    assert.equal(act(item, 'next'), item);
   }
-  item = act(act(item, 'show'), 'meaning', { correct: false });
-  item = act(item, 'retry');
-  assert.equal(item.mistakes.meaning, 2);
   item = act(act(item, 'show'), 'meaning', { correct: true });
   item = act(act(item, 'reading', { value: 'いぬ' }), 'next');
+  assert.equal(act(item, 'next'), item);
   item = act(act(item, 'reading', { value: 'いぬ' }), 'retry');
   item = act(item, 'reading', { value: 'いち' });
   assert.deepEqual(reviewPayload(item).review, {
