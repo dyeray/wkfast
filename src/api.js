@@ -44,6 +44,7 @@ export function createApi(token, fetcher = fetch) {
   if (!token.trim()) throw new Error('Supply your WaniKani API key in the api_key query parameter.');
   const saving = new Set();
   const saved = new Set();
+  const kanji = new Map();
 
   async function request(path, body) {
     const url = apiUrl(path);
@@ -96,6 +97,16 @@ export function createApi(token, fetcher = fetch) {
   }
 
   return {
+    async loadKanji(character) {
+      if (kanji.has(character)) return kanji.get(character);
+      const subjects = await collect(`subjects?types=kanji&slugs=${encodeURIComponent(character)}`);
+      const subject = subjects.find(subject => subject.object === 'kanji' && subject.data?.characters === character);
+      if (!subject) throw new Error('Could not find details for this kanji. Please retry.');
+      validateSubject(subject);
+      kanji.set(character, subject);
+      return subject;
+    },
+
     async loadReviews() {
       const now = Date.now();
       const all = await collect(`assignments?started=true&hidden=false&burned=false&available_before=${encodeURIComponent(new Date(now).toISOString())}`);

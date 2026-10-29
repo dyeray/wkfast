@@ -2,9 +2,10 @@ import { h } from 'preact';
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'preact/hooks';
 import htm from 'htm';
 import { createApi } from './api.js';
-import { reviewReducer, shuffleReviews, deferReview } from './review.js';
+import { reviewReducer, shuffleReviews, deferReview, meaningDetails } from './review.js';
 import { normalizeReading, editKana } from './kana.js';
 import { KanaKeyboard } from './KanaKeyboard.js';
+import { KanjiDetails } from './KanjiDetails.js';
 
 const html = htm.bind(h);
 const LABELS = { kanji: 'Kanji', vocabulary: 'Vocabulary', radical: 'Radical', kana_vocabulary: 'Kana vocabulary' };
@@ -29,6 +30,7 @@ function Review({ initialItem, api, onDone, onNext }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [composing, setComposing] = useState(false);
+  const [selectedKanji, setSelectedKanji] = useState(null);
   const [touchInput] = useState(() => matchMedia('(pointer: coarse)').matches);
   const busy = useRef(false);
   const leaving = useRef(false);
@@ -36,7 +38,7 @@ function Review({ initialItem, api, onDone, onNext }) {
   const caret = useRef(null);
   const { subject, phase, feedback } = item;
   const image = subject.data.character_images?.find(image => image.content_type === 'image/svg+xml');
-  const meanings = subject.data.meanings.filter(meaning => meaning.accepted_answer).map(meaning => meaning.meaning).join(', ');
+  const meanings = meaningDetails(subject);
   const readings = subject.data.readings?.filter(reading => reading.accepted_answer).map(reading => reading.reading).join(' / ');
 
   useLayoutEffect(() => {
@@ -123,7 +125,11 @@ function Review({ initialItem, api, onDone, onNext }) {
     <section class="review" aria-label="Current review">
       <div class=${`subject ${subject.object}`}>
         ${subject.data.characters
-          ? html`<div class="characters" lang="ja">${subject.data.characters}</div>`
+          ? html`<div class="characters" lang="ja"><span>${Array.from(subject.data.characters).map(character =>
+              item.revealed && (subject.object === 'kanji' || (subject.object === 'vocabulary' && /\p{Unified_Ideograph}/u.test(character)))
+                ? html`<button class="kanji-character" type="button" aria-label=${`Show details for ${character}`} aria-haspopup="dialog"
+                    onClick=${() => setSelectedKanji(character)}>${character}</button>` : character
+            )}</span></div>`
           : html`<div class="characters"><img src=${image.url} alt="Radical to review" referrerPolicy="no-referrer" /></div>`}
       </div>
 
@@ -134,7 +140,8 @@ function Review({ initialItem, api, onDone, onNext }) {
       ${phase === 'meaning' && html`
         <div class="meaning-answer" aria-live="polite">
           <p class="eyebrow">Meaning</p>
-          <p class=${item.revealed ? 'answer' : 'prompt'}>${item.revealed ? meanings : 'Think of the meaning.'}</p>
+          <p class=${item.revealed ? 'answer' : 'prompt'}>${item.revealed ? meanings.primary : 'Think of the meaning.'}</p>
+          ${item.revealed && meanings.alternatives.length > 0 && html`<p class="alternative-meanings"><strong>Alternative meanings:</strong> ${meanings.alternatives.join(', ')}</p>`}
         </div>
         ${item.revealed ? html`
           <div class="grading">
@@ -179,6 +186,7 @@ function Review({ initialItem, api, onDone, onNext }) {
         <span>${item.mistakes.meaning + item.mistakes.reading} mistakes</span>
         <button class="text-button snooze" onClick=${snooze} disabled=${phase === 'ready' || saving}>Snooze</button>
       </div>
+      ${selectedKanji && html`<${KanjiDetails} character=${selectedKanji} subject=${subject} api=${api} onClose=${() => setSelectedKanji(null)} />`}
     </section>
   `;
 }

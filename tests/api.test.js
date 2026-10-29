@@ -58,6 +58,31 @@ test('empty sessions do not fetch all subjects', async () => {
   assert.equal(calls, 1);
 });
 
+test('loads and caches a kanji lookup using an encoded character filter', async () => {
+  const calls = [];
+  const api = createApi('test-token', async (url, options) => {
+    calls.push({ url: new URL(url), options });
+    return json(page([subject]));
+  });
+  const first = await api.loadKanji('一');
+  assert.equal(first.data.characters, '一');
+  assert.equal(await api.loadKanji('一'), first);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url.searchParams.get('types'), 'kanji');
+  assert.equal(calls[0].url.searchParams.get('slugs'), '一');
+  assert.equal(calls[0].options.headers.Authorization, 'Bearer test-token');
+});
+
+test('missing or malformed kanji lookups fail without being cached and can be retried', async () => {
+  for (const result of [[], [{ ...subject, object: 'radical' }], [{ ...subject, data: { ...subject.data, characters: '二' } }], [{ ...subject, data: {} }]]) {
+    let calls = 0;
+    const api = createApi('test-token', async () => json(page(calls++ ? [subject] : result)));
+    await assert.rejects(api.loadKanji('一'), /kanji|subject/i);
+    assert.equal((await api.loadKanji('一')).data.characters, '一');
+    assert.equal(calls, 2);
+  }
+});
+
 test('pagination cannot send the credential to another host or leave the API', async () => {
   for (const next of ['https://evil.example/steal', 'https://api.wanikani.com/other', 'https://evil.example@api.wanikani.com/v2/subjects']) {
     let calls = 0;

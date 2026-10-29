@@ -1,5 +1,15 @@
 import { normalizeReading } from './kana.js';
 
+export function meaningDetails(subject) {
+  const accepted = subject.data.meanings.filter(meaning => meaning.accepted_answer);
+  const primary = accepted.find(meaning => meaning.primary) || accepted[0];
+  const alternatives = [
+    ...accepted.filter(meaning => meaning !== primary).map(meaning => meaning.meaning),
+    ...(subject.data.auxiliary_meanings || []).filter(meaning => meaning.type === 'whitelist').map(meaning => meaning.meaning),
+  ];
+  return { primary: primary.meaning, alternatives: [...new Set(alternatives)].filter(meaning => meaning !== primary.meaning) };
+}
+
 export function shuffleReviews(items) {
   const queue = [...items];
   for (let index = queue.length - 1; index > 0; index--) {

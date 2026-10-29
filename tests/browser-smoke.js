@@ -11,13 +11,27 @@ async (page) => {
   });
   const subjects = [
     { id: 440, object: 'kanji', data: { ...data('一', 'One', ['いち']), readings: [
-      { reading: 'いち', accepted_answer: true }, { reading: 'ひと', accepted_answer: false },
+      { reading: 'いち', type: 'onyomi', accepted_answer: true }, { reading: 'ひと', type: 'kunyomi', accepted_answer: false },
+    ], meanings: [
+      { meaning: 'One', primary: true, accepted_answer: true },
+      { meaning: 'Single', primary: false, accepted_answer: true },
+    ], auxiliary_meanings: [
+      { meaning: 'Unity', type: 'whitelist' }, { meaning: 'Wrong', type: 'blacklist' },
     ] } },
     { id: 441, object: 'vocabulary', data: data('学校', 'School', ['がっこう']) },
     { id: 442, object: 'radical', data: { ...data(null, 'Ground'), character_images: [
       { url: 'https://cdn.wanikani.com/test-radical.svg', content_type: 'image/svg+xml' },
     ] } },
     { id: 443, object: 'kana_vocabulary', data: data('ありがとう', 'Thank you') },
+  ];
+  const kanjiDetails = [
+    { id: 500, object: 'kanji', data: { ...data('学', 'Study', ['がく']), readings: [
+      { reading: 'がく', type: 'onyomi', accepted_answer: true },
+      { reading: 'まなぶ', type: 'kunyomi', accepted_answer: false },
+    ] } },
+    { id: 501, object: 'kanji', data: { ...data('校', 'School', ['こう']), readings: [
+      { reading: 'こう', type: 'onyomi', accepted_answer: true },
+    ] } },
   ];
   const assignments = subjects.map((subject, index) => ({ id: index + 12, data: {
     subject_id: subject.id, subject_type: subject.object, hidden: false,
@@ -33,6 +47,7 @@ async (page) => {
     Math.random = () => 0.999999;
   });
   let firstSave = true;
+  let detailFetches = 0;
   await page.route('https://cdn.wanikani.com/**', route => route.fulfill({
     contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path stroke="white" stroke-width="10" d="M10 50h80"/></svg>',
   }));
@@ -51,6 +66,13 @@ async (page) => {
         return;
       }
       body = { id: 0, object: 'review' };
+    } else if (url.searchParams.get('types') === 'kanji') {
+      detailFetches++;
+      if (detailFetches === 1) {
+        await route.fulfill({ status: 500, json: { error: 'Temporary lookup failure' } });
+        return;
+      }
+      body = { data: kanjiDetails.filter(subject => subject.data.characters === url.searchParams.get('slugs')), pages: { next_url: null } };
     } else if (/\/assignments\/\d+$/.test(url.pathname)) {
       body = assignments.find(assignment => assignment.id === Number(url.pathname.split('/').pop()));
     } else {
@@ -62,8 +84,23 @@ async (page) => {
   await page.getByRole('button', { name: 'Show meaning', exact: true }).waitFor();
   assert(new URL(page.url()).searchParams.get('api_key') === 'smoke-test-token', 'Query key must remain available for refresh');
   assert(await page.locator('input[type="password"]').count() === 0, 'No API-key entry form should exist');
+  assert(await page.getByText('Unity', { exact: true }).count() === 0, 'Alternative meanings must remain hidden before Show');
+  assert(await page.getByRole('button', { name: 'Show details for 一', exact: true }).count() === 0, 'Kanji details must not be available before revealing an answer');
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
+  assert(await page.locator('.answer').textContent() === 'One', 'The primary meaning must be shown separately');
+  assert(await page.locator('.alternative-meanings').textContent() === 'Alternative meanings: Single, Unity', 'Accepted alternative meanings must be visible while grading');
+  await page.getByRole('button', { name: 'Show details for 一', exact: true }).click();
+  const ownKanji = page.getByRole('dialog', { name: '一 kanji details', exact: true });
+  await ownKanji.getByText('ひと', { exact: true }).waitFor();
+  assert(await ownKanji.getByText('いち', { exact: true }).count() === 1, 'Popup must include on’yomi');
+  assert(await ownKanji.getByText('Single, Unity', { exact: true }).count() === 1, 'Popup must include alternative meanings');
+  assert(await ownKanji.getByText('Wrong', { exact: true }).count() === 0, 'Blacklisted meanings must not be shown as alternatives');
+  await page.keyboard.press('Escape');
+  await ownKanji.waitFor({ state: 'detached' });
+  assert(await page.getByRole('button', { name: 'Show details for 一', exact: true }).evaluate(button => button === document.activeElement), 'Closing the dialog must restore focus');
+  assert(detailFetches === 0 && writes.length === 0, 'Opening the current kanji must reuse its data without submitting a review');
   await page.getByRole('button', { name: 'Correct', exact: true }).click();
+  assert(await page.getByRole('button', { name: 'Show details for 一', exact: true }).count() === 0, 'Details must be hidden again during the unanswered reading');
   const contextMenus = await page.getByRole('button', { name: 'は row', exact: true }).evaluate(button => ({
     keyboard: !button.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })),
     outside: document.querySelector('h1').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })),
@@ -119,7 +156,28 @@ async (page) => {
   await page.getByText('学校', { exact: true }).waitFor();
   assert(writes.length === 2, 'Unexpected duplicate save');
   assert(writes[1].incorrect_meaning_answers === 0 && writes[1].incorrect_reading_answers === 0, 'Retry must not commit pending mistakes');
+  assert(await page.getByRole('button', { name: 'Show details for 学', exact: true }).count() === 0, 'Vocabulary kanji must stay unrevealed before Show');
   await page.getByRole('button', { name: 'Show meaning', exact: true }).click();
+  await page.getByRole('button', { name: 'Show details for 学', exact: true }).click();
+  const study = page.getByRole('dialog', { name: '学 kanji details', exact: true });
+  await study.getByRole('alert').waitFor();
+  await study.getByRole('button', { name: 'Retry kanji lookup', exact: true }).click();
+  await study.getByText('まなぶ', { exact: true }).waitFor();
+  assert(await study.getByText('Study', { exact: true }).count() === 1, 'Vocabulary popup must show the clicked kanji’s meaning');
+  await study.getByRole('button', { name: 'Close kanji details', exact: true }).click();
+  await study.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Show details for 学', exact: true }).click();
+  await study.getByText('Study', { exact: true }).waitFor();
+  assert(detailFetches === 2, 'Successful kanji details must be cached for this session');
+  await page.keyboard.press('Escape');
+  await study.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Show details for 校', exact: true }).click();
+  const school = page.getByRole('dialog', { name: '校 kanji details', exact: true });
+  await school.getByText('こう', { exact: true }).waitFor();
+  assert(await school.getByText('—', { exact: true }).count() === 1, 'Missing kun’yomi must be represented without inventing a reading');
+  await school.getByRole('button', { name: 'Close kanji details', exact: true }).click();
+  await school.waitFor({ state: 'detached' });
+  assert(writes.length === 2, 'Kanji lookups must not submit reviews');
   await page.getByRole('button', { name: 'Correct', exact: true }).click();
   await page.getByRole('button', { name: 'Snooze', exact: true }).click();
   await page.getByRole('img', { name: 'Radical to review', exact: true }).waitFor();
@@ -164,6 +222,12 @@ async (page) => {
     } }));
     await phone.goto('http://localhost:5173/?api_key=smoke-test-token');
     await phone.getByRole('button', { name: 'Show meaning', exact: true }).tap();
+    await phone.getByRole('button', { name: 'Show details for 一', exact: true }).tap();
+    const phoneDetails = phone.getByRole('dialog', { name: '一 kanji details', exact: true });
+    await phoneDetails.getByText('ひと', { exact: true }).waitFor();
+    assert(await phoneDetails.evaluate(dialog => dialog.scrollWidth <= dialog.clientWidth), 'Kanji popup must fit the phone viewport');
+    await phoneDetails.getByRole('button', { name: 'Close kanji details', exact: true }).tap();
+    await phoneDetails.waitFor({ state: 'detached' });
     await phone.getByRole('button', { name: 'Correct', exact: true }).tap();
     const input = phone.getByLabel('Your reading');
     assert(await input.evaluate(element => element.readOnly && element.inputMode === 'none'), 'Phone reading input must be readonly and suppress its software keyboard');

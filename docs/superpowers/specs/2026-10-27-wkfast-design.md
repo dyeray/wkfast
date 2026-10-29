@@ -28,6 +28,8 @@ Completing meaning and reading together limits partially finished work if the br
 
 Use WaniKani-style subject backgrounds (blue radical, pink kanji, purple vocabulary), white meaning prompts, and dark reading prompts. Keep the original self-grading meaning flow and independent client branding.
 
+Revealed meanings show the primary meaning and accepted alternatives, including whitelisted auxiliary meanings. Only while an answer is revealed, kanji in the displayed subject become tappable. A native modal dialog shows the selected kanji's meanings and separately labeled on’yomi and kun’yomi, including nonaccepted dictionary readings. Vocabulary kanji are looked up individually through WaniKani's subject filter; current kanji subjects reuse their data. Handle lookup failures with a retry inside the dialog and keep successful lookups in memory only. Closing the dialog restores focus and preserves the review, input, and mistake counts.
+
 ## Errors and credentials
 
 Show actionable authentication, permission, rate-limit, loading, and saving errors. Keep an unsaved completed item on screen with a retry action. Before retrying an ambiguous failed submission, check whether its assignment is still due to avoid submitting it twice.

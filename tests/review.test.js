@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createItem, reviewReducer, reviewPayload, checkReading, shuffleReviews, deferReview } from '../src/review.js';
+import { createItem, reviewReducer, reviewPayload, checkReading, shuffleReviews, deferReview, meaningDetails } from '../src/review.js';
 import { KANA_ROWS, normalizeReading, flickIndex, editKana } from '../src/kana.js';
 
 const assignment = { id: 12, data: { subject_id: 440 } };
@@ -16,6 +16,23 @@ const kanji = {
   },
 };
 const act = (item, type, values = {}) => reviewReducer(item, { type, ...values });
+
+test('meaning details include accepted alternatives and whitelist meanings, excluding rejected meanings', () => {
+  const subject = { data: {
+    meanings: [
+      { meaning: 'Single', primary: false, accepted_answer: true },
+      { meaning: 'One', primary: true, accepted_answer: true },
+      { meaning: 'Zero', primary: false, accepted_answer: false },
+    ],
+    auxiliary_meanings: [
+      { meaning: 'Unity', type: 'whitelist' },
+      { meaning: 'Single', type: 'whitelist' },
+      { meaning: 'Wrong', type: 'blacklist' },
+    ],
+  } };
+  assert.deepEqual(meaningDetails(subject), { primary: 'One', alternatives: ['Single', 'Unity'] });
+  assert.deepEqual(meaningDetails(kanji), { primary: 'One', alternatives: [] });
+});
 
 test('session shuffling reorders the queue without mutating or losing review items', context => {
   context.mock.method(Math, 'random', () => 0);
