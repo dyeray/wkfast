@@ -34,6 +34,10 @@ Installation is local to `node_modules/`. The postinstall script copies Preact, 
 
 ## Host statically
 
+The [GitHub Pages workflow](.github/workflows/pages.yml) runs the tests and deploys `index.html`, `src/`, and `vendor/` on every push to `main`. It only copies these static files into a deployment artifact; no compilation or dependency installation is needed. The site URL is <https://dyeray.github.io/wkfast/>.
+
+One-time repository setup: under **Settings → Pages → Build and deployment**, select **GitHub Actions** as the source. The workflow can also be run manually from the Actions tab.
+
 Serve these paths together from any static host, using HTTPS in production:
 
 ```text
