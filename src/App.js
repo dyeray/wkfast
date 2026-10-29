@@ -41,6 +41,7 @@ function Review({ initialItem, api, onDone, onNext }) {
 
   useLayoutEffect(() => {
     if (caret.current !== null && field.current) {
+      field.current.focus({ preventScroll: true });
       field.current.setSelectionRange(caret.current, caret.current);
       caret.current = null;
     }

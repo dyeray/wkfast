@@ -88,6 +88,8 @@ async (page) => {
   await page.getByRole('button', { name: 'Clear', exact: true }).click();
   await page.getByRole('button', { name: 'あ row', exact: true }).click();
   await page.getByRole('group', { name: 'あ kana options', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'い', exact: true }).click({ button: 'right' });
+  assert(await page.getByLabel('Your reading').inputValue() === '', 'Right-clicking an option must not enter kana');
   await page.getByRole('button', { name: 'い', exact: true }).click();
   await page.getByRole('button', { name: 'た row', exact: true }).click();
   await page.getByRole('button', { name: 'ち', exact: true }).click();
@@ -167,8 +169,18 @@ async (page) => {
     assert(await input.evaluate(element => element.readOnly && element.inputMode === 'none'), 'Phone reading input must be readonly and suppress its software keyboard');
     await input.tap();
     await phone.getByRole('button', { name: 'あ row', exact: true }).tap();
+    assert(await input.inputValue() === '', 'Opening a kana row must not enter a character on the same tap');
+    await phone.getByRole('group', { name: 'あ kana options', exact: true }).waitFor();
     await phone.getByRole('button', { name: 'い', exact: true }).tap();
     assert(await input.inputValue() === 'い', 'Custom keyboard must still update the readonly phone input');
+    await phone.getByRole('button', { name: 'た row', exact: true }).tap();
+    await phone.getByRole('button', { name: 'ち', exact: true }).tap();
+    assert(await input.inputValue() === 'いち', 'Consecutive phone taps must preserve kana order');
+    await phone.getByRole('button', { name: 'か row', exact: true }).focus();
+    await phone.getByRole('button', { name: 'か row', exact: true }).press('Enter');
+    await phone.getByRole('button', { name: 'か', exact: true }).focus();
+    await phone.getByRole('button', { name: 'か', exact: true }).press('Enter');
+    assert(await input.inputValue() === 'いちか', 'Keyboard activation must still select a kana once');
   } finally {
     await phoneContext.close();
   }

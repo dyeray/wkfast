@@ -50,10 +50,13 @@ export function KanaKeyboard({ onKana, onBackspace, onClear, disabled }) {
     if (!drag || drag.id !== event.pointerId) return;
     gesture.current = null;
     if (drag.moved) {
-      const kana = drag.row.kana[flickIndex(event.clientX - drag.center.x, event.clientY - drag.center.y)];
-      if (kana && !disabled) onKana(kana);
-      setMenu(null);
+      choose(drag.row.kana[flickIndex(event.clientX - drag.center.x, event.clientY - drag.center.y)]);
     }
+  }
+
+  function choose(kana) {
+    if (kana && !disabled) onKana(kana);
+    setMenu(null);
   }
 
   return html`
@@ -84,7 +87,8 @@ export function KanaKeyboard({ onKana, onBackspace, onClear, disabled }) {
           ${menu.row.kana.map((kana, index) => kana && html`
             <button key=${index} type="button" class=${`radial-option ${DIRECTIONS[index]} ${menu.index === index ? 'selected' : ''}`}
               lang="ja" aria-label=${kana} disabled=${disabled}
-              onClick=${() => { onKana(kana); setMenu(null); }}>${kana}</button>
+              onPointerUp=${event => { if (event.isPrimary && event.button === 0) choose(kana); }}
+              onClick=${event => { if (event.detail === 0) choose(kana); }}>${kana}</button>
           `)}
         </div>
       `}
